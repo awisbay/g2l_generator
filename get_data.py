@@ -50,7 +50,7 @@ RLSRP:CELL={cell};"""
             script_lines.append(section)
 
         joined_cells = '&'.join(cells)
-        closing = f"\nIOEXP;\nRLEFP:CELL={joined_cells};\nRLSRP:CELL={joined_cells};\nCACLP;"
+        closing = f"\n\nIOEXP;\nRLEFP:CELL={joined_cells};\nRLSRP:CELL={joined_cells};\nCACLP;"
         full_script = '\n\n'.join(script_lines) + closing
         filename = f"{bsc}_G2L_{now_str}.txt"
         generated_files[filename] = full_script
