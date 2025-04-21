@@ -1,6 +1,9 @@
-from get_data import generate_scripts_grouped_by_bsc
+
 import streamlit as st
 import pandas as pd
+
+from g2l_app import generate_scripts_grouped_by_bsc
+
 
 
 
