@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-#from prepost_app import posthc_newbsc, prehc_legacybsc
+from prepost_app import posthc_newbsc, prehc_legacybsc
 
 
 st.title("Generate PreHC and PostHC")

@@ -1,9 +1,6 @@
 import pandas as pd
 
 # Load Excel file and read 'target_cells' sheet
-file_path = 'MD-QC-BSC-Template-20220622_102727.xlsx'
-df = pd.read_excel(file_path, sheet_name='target_cells')
-
 # Extract relevant columns
 def posthc_newbsc(df):
     bsc_new_list = df['BSC_NEW'].tolist()
