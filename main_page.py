@@ -9,7 +9,6 @@ pg = st.navigation(
         "2G Migration" : [g2l_generator, prepost_hc],
         "3G Migration" : [polygon_app]
     }
-    
 )
 st.set_page_config(page_title="IRS 2G Migration", page_icon=":material/edit:")
 pg.run()
