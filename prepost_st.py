@@ -21,5 +21,5 @@ if uploaded_file:
     st.markdown(":green[PostHC New BSC]")
     final_output_post = posthc_newbsc(df)
     st.expander("Result PostHC").code(final_output_post)
-    # codetest = st.code(final_output_post)
-    # st.text_area("Result", codetest, height=300)
+else:
+    st.warning("Please upload the Excel file.")
