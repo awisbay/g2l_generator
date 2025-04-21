@@ -7,7 +7,7 @@ st.title("Generate PreHC and PostHC")
 st.divider()
 
 st.markdown('Please Upload MD Template 2G.')
-#uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
 
 # if uploaded_file is not None:
 #     try:
