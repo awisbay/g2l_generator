@@ -11,5 +11,5 @@ pg = st.navigation(
         "3G Migration" : [polygon_app]
     }
 )
-st.set_page_config(page_title="IRS Migration Tools", page_icon=":material/edit:")
+st.set_page_config(page_title="IRS Migration Tools", page_icon="🛡")
 pg.run()

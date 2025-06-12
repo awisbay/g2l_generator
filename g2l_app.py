@@ -29,10 +29,14 @@ def generate_scripts_grouped_by_bsc(df, selected_cells):
             earfcns = group[group['CELL_GSM'] == cell]['EARFCN'].tolist()
             fddarfcn_combined = '&'.join(map(str, earfcns))
             #write parameter to script
+            if cell.startswith("V") or cell.startswith("I"):
+                fddarfcn3g = "4383"
+            else:
+                fddarfcn3g = "1037"
             section = f"""RLUMP:CELL={cell};
 
 RLSRP:CELL={cell};
-RLSRC:CELL={cell},FDDARFCN=1037,RATPRIO=3,HPRIOTHR=4;
+RLSRC:CELL={cell},FDDARFCN={fddarfcn3g},RATPRIO=3,HPRIOTHR=4;
 RLSRP:CELL={cell};
 
 RLEFP:CELL={cell};
