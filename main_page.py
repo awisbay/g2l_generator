@@ -13,5 +13,5 @@ pg = st.navigation(
         "Downloader" : [modump_downloader]
     }
 )
-st.set_page_config(page_title="IRS Migration Tools", page_icon="🛡")
+st.set_page_config(page_title="IRS Migration Tools", page_icon="🛡", layout="wide")
 pg.run()
