@@ -13,7 +13,7 @@ pg = st.navigation(
     {
         "2G Migration" : [g2l_generator, prepost_hc],
         "3G Migration" : [polygon_app],
-        "Downloader" : [modump_downloader, allip_downloader, migration, rbsdump]
+        "Downloader" : [allip_downloader, migration, modump_downloader, rbsdump]
     }
 )
 st.set_page_config(page_title="IRS Migration Tools", page_icon="🛡", layout="wide")
