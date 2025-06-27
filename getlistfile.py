@@ -61,23 +61,26 @@ def file_list_page_download_only():
         #st.success(f"Ditemukan {len(files_info)} file di: `{folder_to_scan}`")
         st.markdown("---")
 
-        # Struktur Kolom: Nama File | Ukuran | Tanggal Modifikasi | Download
-        # Kita mengurangi jumlah kolom karena tidak ada lagi tombol Delete
-        col1, col2, col3, col4 = st.columns([0.4, 0.1, 0.3, 0.2]) # Sesuaikan lebar kolom
+        # Struktur Kolom: Nama File | Ukuran | Tanggal Dibuat | Download | Delete
+        col1, col2, col3, col4, col5 = st.columns([0.4, 0.2, 0.2, 0.15, 0.15]) # Sesuaikan lebar kolom
 
         with col1:
-            st.markdown("**File**")
+            st.write("**File Name**")
         with col2:
-            st.markdown("**Size**")
+            st.write("**Size**")
         with col3:
-            st.markdown("**Date Modified**")
-        st.divider()
+            st.write("**Date Created**")
+        with col4:
+            st.write("**Download**")
+        with col5:
+            st.write("**Delete**")
+        st.markdown("---")
 
         for file_data in files_info:
             file_path = os.path.join(folder_to_scan, file_data['name'])
 
             # Kolom untuk setiap baris file
-            col1_file, col2_size, col3_date, col4_download = st.columns([0.4, 0.1, 0.3, 0.2])
+            col1_file, col2_size, col3_date, col4_download, col5_delete = st.columns([0.4, 0.2, 0.2, 0.15, 0.15])
 
             with col1_file:
                 st.write(file_data['name'])
@@ -95,6 +98,28 @@ def file_list_page_download_only():
                         mime="application/octet-stream",
                         key=f"download_btn_{file_data['name']}" # Kunci unik untuk setiap tombol
                     )
+            with col5_delete:
+                # Logika Konfirmasi Delete (tetap sama)
+                if st.session_state.file_to_delete == file_data['name']:
+                    confirm_col, cancel_col = st.columns(2)
+                    with confirm_col:
+                        if st.button("Confirm", key=f"confirm_delete_{file_data['name']}", help="Click for deletion confirmation."):
+                            try:
+                                os.remove(file_path)
+                                st.success(f"File '{file_data['name']}' is deleted.")
+                                st.session_state.file_to_delete = None
+                                st.rerun()
+                            except OSError as e:
+                                st.error(f"Failed to delete '{file_data['name']}': {e}")
+                    with cancel_col:
+                        if st.button("Cancel", key=f"cancel_delete_{file_data['name']}", help="Click for cancel deletion."):
+                            st.session_state.file_to_delete = None
+                            st.rerun()
+                else:
+                    if st.button("Delete", key=f"delete_btn_{file_data['name']}"):
+                        st.session_state.file_to_delete = file_data['name']
+                        st.warning(f"Are you sure to delete '{file_data['name']}'? Click Confirm.")
+                        st.rerun()
     else:
         st.warning(f"No files inside folder: `{folder_to_scan}`.")
 
