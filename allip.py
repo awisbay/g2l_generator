@@ -101,7 +101,7 @@ def file_list_actions_page():
                 if st.session_state.file_to_delete == file_data['name']:
                     confirm_col, cancel_col = st.columns(2)
                     with confirm_col:
-                        if st.button("Confirm", key=f"confirm_delete_{file_data['name']}", help="Click for deletion confirmation."):
+                        if st.button("Yes", key=f"confirm_delete_{file_data['name']}", help="Click for deletion confirmation."):
                             try:
                                 os.remove(file_path)
                                 st.success(f"File '{file_data['name']}' is deleted.")
@@ -110,7 +110,7 @@ def file_list_actions_page():
                             except OSError as e:
                                 st.error(f"Failed to delete '{file_data['name']}': {e}")
                     with cancel_col:
-                        if st.button("Cancel", key=f"cancel_delete_{file_data['name']}", help="Click for cancel deletion."):
+                        if st.button("No", key=f"cancel_delete_{file_data['name']}", help="Click for cancel deletion."):
                             st.session_state.file_to_delete = None
                             st.rerun()
                 else:
