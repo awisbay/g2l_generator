@@ -162,19 +162,19 @@ def main():
         
         if enbname:
             # Load the templates for the XML files
-            with open("/Users/wisbay/Documents/ypndev/g2l_generator/03_MO_Function.xml", 'r') as f:
+            with open("03_MO_Function.xml", 'r') as f:
                 mo_function_xml = f.read()
                 
-            with open("/Users/wisbay/Documents/ypndev/g2l_generator/04_LNR_Function.xml", 'r') as f:
+            with open("/var/www/irsmigration/04_LNR_Function.xml", 'r') as f:
                 lnr_template = f.read()
                 
-            with open("/Users/wisbay/Documents/ypndev/g2l_generator/08_FeatureActivation.xml", 'r') as f:
+            with open("/var/www/irsmigration/08_FeatureActivation.xml", 'r') as f:
                 feature_activation_xml = f.read()
             
-            with open("/Users/wisbay/Documents/ypndev/g2l_generator/LTE_Cells_Template.xml", 'r') as f:
+            with open("/var/www/irsmigration/LTE_Cells_Template.xml", 'r') as f:
                 lte_cells_template = f.read()
                 
-            with open("/Users/wisbay/Documents/ypndev/g2l_generator/05_Cell_Add_MO_Template.xml", 'r') as f:
+            with open("/var/www/irsmigration/05_Cell_Add_MO_Template.xml", 'r') as f:
                 cell_add_mo_template = f.read()
 
             # Step 3: Generate XML files based on the enbname
