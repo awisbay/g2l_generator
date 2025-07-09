@@ -681,6 +681,15 @@
 								<mnc>720</mnc>
 								<mncLength>3</mncLength>
 							</endcAllowedPlmnList>
+							<eutranCellCoverage>
+								<posCellRadius>15000</posCellRadius>
+								<posCellOpeningAngle>1200</posCellOpeningAngle>
+								<posCellBearing>200</posCellBearing>
+							</eutranCellCoverage>
+							<eutranCellPolygon>
+								<cornerLatitude>45397778</cornerLatitude>
+								<cornerLongitude>-72759722</cornerLongitude>
+							</eutranCellPolygon>
 							<frameStartOffset>
 								<subFrameOffset>0</subFrameOffset>
 							</frameStartOffset>
@@ -799,6 +808,11 @@
 								<tReselectionCdma1xRttSfMedium>100</tReselectionCdma1xRttSfMedium>
 							</systemInformationBlock8>
 						</EUtranCellFDD>
+						<UlCompGroup>
+							<ulCompGroupId>850</ulCompGroupId>
+							<sectorCarrierRef>ManagedElement=1,ENodeBFunction=1,SectorCarrier=DPL358A</sectorCarrierRef>
+							<administrativeState>UNLOCKED</administrativeState>
+						</UlCompGroup>
 					</ENodeBFunction>
 				</ManagedElement>
 			</config>

@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 import zipfile
 import io
+import re
 
 # Step 1: Read the Excel file
 #@st.cache
@@ -11,17 +12,61 @@ def load_excel(file):
 def format_coordinates(coord):
     """
     Takes a coordinate (latitude or longitude) and converts it into an 8-digit format.
-    The number will be rounded up or down based on the last digit.
+    Maximum 8 digits as per requirement.
     """
-    # Remove the decimal point and take the first 8 digits
-    coord_str = str(abs(coord)).replace(".", "")[:8]
+    if coord is None:
+        return None
+    
+    # Convert to the required format and ensure max 8 digits
+    formatted = round(float(coord) * (10 ** 7))
+    
+    # Convert to string and limit to 8 digits
+    coord_str = str(abs(formatted))
+    if len(coord_str) > 8:
+        coord_str = coord_str[:8]
+    
+    # Convert back to int and restore sign
+    result = int(coord_str)
+    if coord < 0:  # Use original coord sign, not formatted
+        result = -result
+        
+    return result
 
-    # Convert the result back to an integer, rounding appropriately
-    formatted_coord = round(float(coord_str) * (10 ** -7))  # Divide by 10^7 to scale it down to the desired precision
-    if coord < 0:
-        formatted_coord = -formatted_coord  # Maintain negative sign for longitude
-
-    return formatted_coord
+def convert_degree_to_decimal(degree_str):
+    """
+    Convert degree format (e.g., "45°29'53.0"N") to decimal format
+    """
+    if pd.isna(degree_str) or degree_str == '':
+        return None
+    
+    # Remove any whitespace
+    degree_str = str(degree_str).strip()
+    
+    # Pattern to match degrees, minutes, seconds format
+    # Example: 45°29'53.0"N or -73°33'1.0"W
+    pattern = r"(-?\d+)°(\d+)'([\d.]+)\"?([NSEW])?"
+    match = re.match(pattern, degree_str)
+    
+    if match:
+        degrees = int(match.group(1))
+        minutes = int(match.group(2))
+        seconds = float(match.group(3))
+        direction = match.group(4) if match.group(4) else ''
+        
+        # Convert to decimal
+        decimal = abs(degrees) + minutes/60 + seconds/3600
+        
+        # Apply sign based on direction or original sign
+        if degrees < 0 or direction in ['S', 'W']:
+            decimal = -decimal
+            
+        return decimal
+    else:
+        # Try to parse as already decimal format
+        try:
+            return float(degree_str)
+        except:
+            return None
 
 # Step 2: Generate XML for 04_LNR_Function.xml
 def generate_lnr_function_xml(enbname, excel_data, template_xml):
@@ -129,10 +174,133 @@ def generate_cell_add_mo_xml(excel_data, enbname, template_xml):
 
     return "\n".join(cell_xml_data)
 
-# Step 5: Create ZIP file with all generated XML files
-def create_zip_file(lnr_function_xml, lte_cells_xml, cell_add_mo_xml, mo_function_xml, feature_activation_xml, enbname):
+def generate_polygon_command(row):
     """
-    Create a ZIP file containing all generated XML files
+    Generate the polygon command for a single row
+    Based on CIQ_LTE.xlsx format where:
+    - Corner X columns contain latitude values
+    - Unnamed: Y columns contain longitude values (paired with Corner columns)
+    """
+    cell_id = row['EutranCellFDDId']
+    corners = []
+    
+    # Define the mapping between Corner columns and their corresponding Unnamed longitude columns
+    corner_mappings = [
+        ('Corner 1', 'Unnamed: 4'),
+        ('Corner 2', 'Unnamed: 6'), 
+        ('Corner 3', 'Unnamed: 8'),
+        ('Corner 4', 'Unnamed: 10'),
+        ('Corner 5', 'Unnamed: 12'),
+        ('Corner 6', 'Unnamed: 14'),
+        ('Corner 7', 'Unnamed: 16'),
+        ('Corner 8', 'Unnamed: 18'),
+        ('Corner 9', 'Unnamed: 20'),
+        ('Corner 10', 'Unnamed: 22'),
+        ('Corner 11', 'Unnamed: 24'),
+        ('Corner 12', 'Unnamed: 26'),
+        ('Corner 13', 'Unnamed: 28'),
+        ('Corner 14', 'Unnamed: 30'),
+        ('Corner 15', 'Unnamed: 32')
+    ]
+    
+    for lat_col, lon_col in corner_mappings:
+        if lat_col in row.index and lon_col in row.index:
+            lat_degree = row[lat_col]
+            lon_degree = row[lon_col]
+            
+            if pd.notna(lat_degree) and pd.notna(lon_degree) and lat_degree != '' and lon_degree != '':
+                # Convert to decimal
+                lat_decimal = convert_degree_to_decimal(lat_degree)
+                lon_decimal = convert_degree_to_decimal(lon_degree)
+                
+                if lat_decimal is not None and lon_decimal is not None:
+                    # For North American coordinates, longitude should typically be negative
+                    # If longitude is positive and appears to be North American (typical range), make it negative
+                    if lon_decimal > 0 and 60 <= lon_decimal <= 180:
+                        lon_decimal = -lon_decimal
+                    
+                    # Format for polygon using the specified calculation
+                    lat_formatted = format_coordinates(lat_decimal)
+                    lon_formatted = format_coordinates(lon_decimal)
+                    
+                    corners.append(f"cornerLatitude={lat_formatted},cornerLongitude={lon_formatted}")
+    
+    if corners:
+        corner_string = ";".join(corners)
+        return f"set EUtranCellFDD={cell_id} eutranCellPolygon {corner_string};"
+    else:
+        return f"# No valid corners found for {cell_id}"
+
+def generate_polygon_mos_file(excel_data, enbname):
+    """
+    Generate the polygon .mos file content for the specified eNB
+    """
+    try:
+        # Check if eUtranCellPolygon sheet exists
+        if 'eUtranCellPolygon' not in excel_data:
+            return None
+            
+        polygon_data = excel_data['eUtranCellPolygon']
+        
+        if 'EutranCellFDDId' not in polygon_data.columns:
+            return None
+        
+        # Filter polygon data for the specified eNB
+        # Get cell IDs for this eNB from eUtran Parameters sheet
+        if 'eUtran Parameters' in excel_data:
+            enb_cells = excel_data['eUtran Parameters'][excel_data['eUtran Parameters']['eNBName'] == enbname]['EutranCellFDDId'].values
+            filtered_polygon_data = polygon_data[polygon_data['EutranCellFDDId'].isin(enb_cells)]
+        else:
+            # If no eUtran Parameters sheet, try to filter by eNBName in polygon sheet
+            if 'eNBName' in polygon_data.columns:
+                filtered_polygon_data = polygon_data[polygon_data['eNBName'] == enbname]
+            else:
+                filtered_polygon_data = polygon_data
+        
+        if len(filtered_polygon_data) == 0:
+            return None
+        
+        # Generate polygon commands
+        commands = []
+        for idx, row in filtered_polygon_data.iterrows():
+            if pd.notna(row['EutranCellFDDId']) and row['EutranCellFDDId'] != '':
+                command = generate_polygon_command(row)
+                commands.append(command)
+        
+        if not commands:
+            return None
+        
+        # Create the .mos file content with proper header and footer
+        mos_content = f"""# ------------------------------------
+# Generate by: XML Generator for eNB Configuration
+# eNB Name: {enbname}
+# ------------------------------------
+
+l mkdir $nodename_Polygon_Coverage_Log
+$timeCheck = `date "+%y%m%d_%H%M%S"`
+l+ $nodename_Polygon_Coverage_Log/$nodename_LTE_Polygon_$timeCheck.log
+
+confb+
+gs+
+alt
+
+{chr(10).join(commands)}
+
+
+alt
+confb-
+gs-
+l-"""
+        
+        return mos_content
+        
+    except Exception as e:
+        return None
+
+# Step 5: Create ZIP file with all generated XML files
+def create_zip_file(lnr_function_xml, lte_cells_xml, cell_add_mo_xml, mo_function_xml, feature_activation_xml, polygon_mos, enbname):
+    """
+    Create a ZIP file containing all generated XML files and polygon .mos file
     """
     zip_buffer = io.BytesIO()
     
@@ -143,6 +311,10 @@ def create_zip_file(lnr_function_xml, lte_cells_xml, cell_add_mo_xml, mo_functio
         zip_file.writestr(f"12_{enbname}_FeatureActivation.xml", feature_activation_xml)
         zip_file.writestr(f"10_{enbname}_LTE_Cells.xml", lte_cells_xml)
         zip_file.writestr(f"11_{enbname}_Cell_Add_MO.xml", cell_add_mo_xml)
+        
+        # Add polygon .mos file if available
+        if polygon_mos:
+            zip_file.writestr(f"13_{enbname}_Polygon.mos", polygon_mos)
     
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
@@ -162,25 +334,28 @@ def main():
         
         if enbname:
             # Load the templates for the XML files
-            with open("03_MO_Function.xml", 'r') as f:
+            with open("/Users/wisbay/Documents/ypndev/g2l_generator/03_MO_Function.xml", 'r') as f:
                 mo_function_xml = f.read()
                 
-            with open("/var/www/irsmigration/04_LNR_Function.xml", 'r') as f:
+            with open("/Users/wisbay/Documents/ypndev/g2l_generator/04_LNR_Function.xml", 'r') as f:
                 lnr_template = f.read()
                 
-            with open("/var/www/irsmigration/08_FeatureActivation.xml", 'r') as f:
+            with open("/Users/wisbay/Documents/ypndev/g2l_generator/08_FeatureActivation.xml", 'r') as f:
                 feature_activation_xml = f.read()
             
-            with open("/var/www/irsmigration/LTE_Cells_Template.xml", 'r') as f:
+            with open("/Users/wisbay/Documents/ypndev/g2l_generator/LTE_Cells_Template.xml", 'r') as f:
                 lte_cells_template = f.read()
                 
-            with open("/var/www/irsmigration/05_Cell_Add_MO_Template.xml", 'r') as f:
+            with open("/Users/wisbay/Documents/ypndev/g2l_generator/05_Cell_Add_MO_Template.xml", 'r') as f:
                 cell_add_mo_template = f.read()
 
             # Step 3: Generate XML files based on the enbname
             lnr_function_xml = generate_lnr_function_xml(enbname, excel_data, lnr_template)
             lte_cells_xml = generate_lte_cells_xml(excel_data, enbname, lte_cells_template)
             cell_add_mo_xml = generate_cell_add_mo_xml(excel_data, enbname, cell_add_mo_template)
+
+            # Generate polygon .mos file content
+            polygon_mos_content = generate_polygon_mos_file(excel_data, enbname)
 
             # Step 4: Display or download the generated XML files
             #st.subheader("Generated 04_LNR_Function.xml")
@@ -189,14 +364,21 @@ def main():
             #st.subheader("Generated LTE_Cells_template.xml")
             #st.text_area("LTE_Cells_template.xml", lte_cells_xml, height=400)
 
-            # Create ZIP file with all XML files
-            zip_data = create_zip_file(lnr_function_xml, lte_cells_xml, cell_add_mo_xml, mo_function_xml, feature_activation_xml, enbname)
+            # Show polygon status
+            if polygon_mos_content:
+                st.success(f"✅ Polygon file generated: 13_{enbname}_Polygon.mos")
+            else:
+                st.warning("⚠️ No polygon data found in Excel file or no eUtranCellPolygon sheet")
+
+            # Create ZIP file with all XML files and polygon .mos file
+            zip_data = create_zip_file(lnr_function_xml, lte_cells_xml, cell_add_mo_xml, mo_function_xml, feature_activation_xml, polygon_mos_content, enbname)
 
             # Option to download individual XML files
             # Option to download all files as ZIP
             st.subheader("Download All Files:")
+            file_count = 5 + (1 if polygon_mos_content else 0)
             st.download_button(
-                "Download All XML Files (ZIP)", 
+                f"Download All Files (ZIP) - {file_count} files", 
                 zip_data, 
                 f"{enbname}_XML_Files.zip",
                 mime="application/zip"
