@@ -3,7 +3,7 @@ import streamlit as st
 
 g2l_generator = st.Page("g2l_st.py", title="GSM To LTE Script Generator", icon="⚙️")
 lte_script_generator = st.Page("generateLTE.py", title="Generate LTE Script", icon="📝")
-ciq_polygon_converter = st.Page("convert_ciq_polygon.py", title="CIQ Polygon Converter", icon="🔷")
+ciq_polygon_converter = st.Page("convert_ciq_polygon.py", title="CIQ Polygon & Coverage Converter", icon="🔷")
 prepost_hc = st.Page("prepost_st.py", title="Pre/Post HC Log Generator", icon="🩺")
 polygon_app = st.Page("polygon_app.py", title="Polygon Converter", icon="✴️")
 modump_downloader = st.Page("getlistfile.py", title="RNC Modump Sunset", icon="🔽")
@@ -15,7 +15,6 @@ pg = st.navigation(
     {
         "2G Migration" : [g2l_generator, prepost_hc],
         "3G Migration" : [polygon_app],
-        "4G Scripting" : [lte_script_generator],
         "Downloader" : [allip_downloader, migration, modump_downloader, rbsdump]
     }
 )

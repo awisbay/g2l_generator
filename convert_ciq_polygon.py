@@ -118,6 +118,24 @@ def generate_polygon_command(row):
     else:
         return f"# No valid corners found for {cell_id}"
 
+def generate_coverage_command(row):
+    """
+    Generate coverage command for a single row from eUtranCellCoverage sheet
+    """
+    cell_id = row['EutranCellFDDId']
+    
+    # Get coverage parameters with defaults if missing
+    pos_cell_bearing = row.get('posCellBearing', 0) if pd.notna(row.get('posCellBearing')) else 0
+    pos_cell_opening_angle = row.get('posCellOpeningAngle', 1200) if pd.notna(row.get('posCellOpeningAngle')) else 1200
+    pos_cell_radius = row.get('posCellRadius', 15000) if pd.notna(row.get('posCellRadius')) else 15000
+    
+    # Convert to integers
+    pos_cell_bearing = int(float(pos_cell_bearing))
+    pos_cell_opening_angle = int(float(pos_cell_opening_angle))
+    pos_cell_radius = int(float(pos_cell_radius))
+    
+    return f"set EutranCellFDD={cell_id} eutranCellCoverage posCellBearing={pos_cell_bearing},posCellOpeningAngle={pos_cell_opening_angle},posCellRadius={pos_cell_radius}"
+
 def load_excel_and_convert(file_path):
     """
     Load the Excel file and convert to polygon commands
@@ -141,61 +159,162 @@ def load_excel_and_convert(file_path):
     except Exception as e:
         return None, f"Error reading Excel file: {str(e)}"
 
+def load_excel_and_convert_coverage(file_path):
+    """
+    Load the Excel file and convert to coverage commands
+    """
+    try:
+        # Read the specific sheet that contains coverage data
+        coverage_data = pd.read_excel(file_path, sheet_name='eUtranCellCoverage')
+        
+        if 'EutranCellFDDId' not in coverage_data.columns:
+            return None, "EutranCellFDDId column not found in eUtranCellCoverage sheet"
+        
+        # Generate coverage commands
+        commands = []
+        for idx, row in coverage_data.iterrows():
+            if pd.notna(row['EutranCellFDDId']) and row['EutranCellFDDId'] != '':
+                command = generate_coverage_command(row)
+                commands.append(command)
+        
+        return commands, f"Successfully processed {len(commands)} cells from eUtranCellCoverage sheet"
+        
+    except Exception as e:
+        return None, f"Error reading Excel file: {str(e)}"
+
 # Streamlit App Interface
 def main():
-    st.title("CIQ LTE Polygon Converter")
-    st.write("Convert CIQ_LTE.xlsx polygon data to MO command format")
+    st.title("CIQ LTE Polygon & Coverage Converter")
+    st.write("Convert CIQ_LTE.xlsx polygon and coverage data to MO command format")
     
     # Step 1: Upload the Excel File
     uploaded_file = st.file_uploader("Upload CIQ_LTE.xlsx File", type=["xlsx"])
     
     if uploaded_file:
-        # Load and convert the data
-        commands, message = load_excel_and_convert(uploaded_file)
+        # Check available sheets
+        try:
+            excel_data = pd.read_excel(uploaded_file, sheet_name=None)
+            available_sheets = list(excel_data.keys())
+            st.info(f"Available sheets: {', '.join(available_sheets)}")
+        except:
+            st.error("Error reading Excel file")
+            return
         
-        st.info(message)
+        # Process polygon data
+        polygon_commands = None
+        polygon_message = None
+        if 'eUtranCellPolygon' in available_sheets:
+            polygon_commands, polygon_message = load_excel_and_convert(uploaded_file)
         
-        if commands:
-            # Display the results
-            st.subheader("Generated Polygon Commands")
+        # Process coverage data  
+        coverage_commands = None
+        coverage_message = None
+        if 'eUtranCellCoverage' in available_sheets:
+            coverage_commands, coverage_message = load_excel_and_convert_coverage(uploaded_file)
+        
+        # Display results
+        if polygon_commands or coverage_commands:
+            all_commands = []
             
-            # Show first few commands as preview
-            st.write("**Preview (first 5 commands):**")
-            for i, cmd in enumerate(commands[:5]):
-                st.code(cmd)
+            if polygon_commands:
+                st.success(polygon_message)
+                st.subheader("Generated Polygon Commands")
+                st.write("**Preview (first 3 polygon commands):**")
+                for i, cmd in enumerate(polygon_commands[:3]):
+                    st.code(cmd)
+                if len(polygon_commands) > 3:
+                    st.write(f"... and {len(polygon_commands) - 3} more polygon commands")
+                all_commands.extend(polygon_commands)
             
-            if len(commands) > 5:
-                st.write(f"... and {len(commands) - 5} more commands")
+            if coverage_commands:
+                st.success(coverage_message)
+                st.subheader("Generated Coverage Commands")
+                st.write("**Preview (first 3 coverage commands):**")
+                for i, cmd in enumerate(coverage_commands[:3]):
+                    st.code(cmd)
+                if len(coverage_commands) > 3:
+                    st.write(f"... and {len(coverage_commands) - 3} more coverage commands")
+                if polygon_commands:
+                    all_commands.append("")  # Add empty line between sections
+                all_commands.extend(coverage_commands)
             
             # Prepare download content
-            download_content = "\n".join(commands)
+            download_content = "\n".join(all_commands)
             
             # Download button
             st.download_button(
-                label="Download All Polygon Commands",
+                label="Download All Commands",
                 data=download_content,
-                file_name="polygon_commands.txt",
+                file_name="polygon_coverage_commands.txt",
                 mime="text/plain"
             )
-            
-            # Show column information for debugging
-            with st.expander("Debug: Show detected columns"):
-                try:
-                    excel_data = pd.read_excel(uploaded_file, sheet_name=None)
-                    for sheet_name, df in excel_data.items():
-                        if 'EutranCellFDDId' in df.columns:
-                            st.write(f"**Sheet: {sheet_name}**")
-                            st.write("Columns:", list(df.columns))
+        else:
+            if not polygon_commands and 'eUtranCellPolygon' in available_sheets:
+                st.error(polygon_message)
+            if not coverage_commands and 'eUtranCellCoverage' in available_sheets:
+                st.error(coverage_message)
+            if 'eUtranCellPolygon' not in available_sheets and 'eUtranCellCoverage' not in available_sheets:
+                st.warning("No eUtranCellPolygon or eUtranCellCoverage sheets found in the uploaded file")
+        
+        # Show column information for debugging
+        with st.expander("Debug: Show detected columns"):
+            try:
+                for sheet_name, df in excel_data.items():
+                    if sheet_name in ['eUtranCellPolygon', 'eUtranCellCoverage']:
+                        st.write(f"**Sheet: {sheet_name}**")
+                        st.write("Columns:", list(df.columns))
+                        
+                        if sheet_name == 'eUtranCellPolygon':
                             corner_cols = [col for col in df.columns if 'corner' in col.lower() or 'latitude' in col.lower() or 'longitude' in col.lower()]
                             st.write("Corner-related columns:", corner_cols)
+                        elif sheet_name == 'eUtranCellCoverage':
+                            coverage_cols = [col for col in df.columns if any(x in col.lower() for x in ['bearing', 'angle', 'radius'])]
+                            st.write("Coverage-related columns:", coverage_cols)
+                        
+                        # Show sample data
+                        if len(df) > 0:
+                            st.write("Sample row:")
+                            relevant_cols = ['EutranCellFDDId']
+                            if sheet_name == 'eUtranCellPolygon':
+                                relevant_cols.extend([col for col in df.columns if 'Corner' in col][:4])
+                            elif sheet_name == 'eUtranCellCoverage':
+                                relevant_cols.extend(['posCellBearing', 'posCellOpeningAngle', 'posCellRadius'])
                             
-                            # Show sample data
-                            if len(df) > 0:
-                                st.write("Sample row:")
-                                st.write(df.iloc[0][['EutranCellFDDId'] + corner_cols[:4]].to_dict())
-                            break
-                except Exception as e:
-                    st.error(f"Error showing debug info: {e}")
+                            sample_data = {}
+                            for col in relevant_cols:
+                                if col in df.columns:
+                                    sample_data[col] = df.iloc[0][col]
+                            st.write(sample_data)
+            except Exception as e:
+                st.error(f"Error showing debug info: {e}")
+        
+        # Load and convert coverage data if available
+        coverage_commands, coverage_message = load_excel_and_convert_coverage(uploaded_file)
+        
+        st.info(coverage_message)
+        
+        if coverage_commands:
+            # Display the results
+            st.subheader("Generated Coverage Commands")
+            
+            # Show first few commands as preview
+            st.write("**Preview (first 5 commands):**")
+            for i, cmd in enumerate(coverage_commands[:5]):
+                st.code(cmd)
+            
+            if len(coverage_commands) > 5:
+                st.write(f"... and {len(coverage_commands) - 5} more commands")
+            
+            # Prepare download content
+            download_content = "\n".join(coverage_commands)
+            
+            # Download button
+            st.download_button(
+                label="Download All Coverage Commands",
+                data=download_content,
+                file_name="coverage_commands.txt",
+                mime="text/plain"
+            )
 
 if __name__ == "__main__":
     main()

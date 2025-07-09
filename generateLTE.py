@@ -233,44 +233,52 @@ def generate_polygon_command(row):
 
 def generate_polygon_mos_file(excel_data, enbname):
     """
-    Generate the polygon .mos file content for the specified eNB
+    Generate the polygon and coverage .mos file content for the specified eNB
     """
     try:
-        # Check if eUtranCellPolygon sheet exists
-        if 'eUtranCellPolygon' not in excel_data:
-            return None
-            
-        polygon_data = excel_data['eUtranCellPolygon']
-        
-        if 'EutranCellFDDId' not in polygon_data.columns:
-            return None
-        
-        # Filter polygon data for the specified eNB
-        # Get cell IDs for this eNB from eUtran Parameters sheet
-        if 'eUtran Parameters' in excel_data:
-            enb_cells = excel_data['eUtran Parameters'][excel_data['eUtran Parameters']['eNBName'] == enbname]['EutranCellFDDId'].values
-            filtered_polygon_data = polygon_data[polygon_data['EutranCellFDDId'].isin(enb_cells)]
-        else:
-            # If no eUtran Parameters sheet, try to filter by eNBName in polygon sheet
-            if 'eNBName' in polygon_data.columns:
-                filtered_polygon_data = polygon_data[polygon_data['eNBName'] == enbname]
-            else:
-                filtered_polygon_data = polygon_data
-        
-        if len(filtered_polygon_data) == 0:
-            return None
+        polygon_commands = []
+        coverage_commands = []
         
         # Generate polygon commands
-        commands = []
-        for idx, row in filtered_polygon_data.iterrows():
-            if pd.notna(row['EutranCellFDDId']) and row['EutranCellFDDId'] != '':
-                command = generate_polygon_command(row)
-                commands.append(command)
+        if 'eUtranCellPolygon' in excel_data:
+            polygon_data = excel_data['eUtranCellPolygon']
+            
+            if 'EutranCellFDDId' in polygon_data.columns:
+                # Filter polygon data for the specified eNB
+                if 'eUtran Parameters' in excel_data:
+                    enb_cells = excel_data['eUtran Parameters'][excel_data['eUtran Parameters']['eNBName'] == enbname]['EutranCellFDDId'].values
+                    filtered_polygon_data = polygon_data[polygon_data['EutranCellFDDId'].isin(enb_cells)]
+                else:
+                    # If no eUtran Parameters sheet, try to filter by eNBName in polygon sheet
+                    if 'eNBName' in polygon_data.columns:
+                        filtered_polygon_data = polygon_data[polygon_data['eNBName'] == enbname]
+                    else:
+                        filtered_polygon_data = polygon_data
+                
+                # Generate polygon commands
+                for idx, row in filtered_polygon_data.iterrows():
+                    if pd.notna(row['EutranCellFDDId']) and row['EutranCellFDDId'] != '':
+                        command = generate_polygon_command(row)
+                        polygon_commands.append(command)
         
-        if not commands:
+        # Generate coverage commands
+        coverage_commands = generate_coverage_commands(excel_data, enbname)
+        
+        # If no commands generated, return None
+        if not polygon_commands and not coverage_commands:
             return None
         
         # Create the .mos file content with proper header and footer
+        content_sections = []
+        
+        if polygon_commands:
+            content_sections.append(chr(10).join(polygon_commands))
+        
+        if coverage_commands:
+            if polygon_commands:
+                content_sections.append("")  # Add empty line between sections
+            content_sections.append(chr(10).join(coverage_commands))
+        
         mos_content = f"""# ------------------------------------
 # Generate by: XML Generator for eNB Configuration
 # eNB Name: {enbname}
@@ -284,7 +292,7 @@ confb+
 gs+
 alt
 
-{chr(10).join(commands)}
+{chr(10).join(content_sections)}
 
 
 alt
@@ -296,6 +304,59 @@ l-"""
         
     except Exception as e:
         return None
+
+def generate_coverage_commands(excel_data, enbname):
+    """
+    Generate coverage commands for the specified eNB from eUtranCellCoverage sheet
+    """
+    try:
+        # Check if eUtranCellCoverage sheet exists
+        if 'eUtranCellCoverage' not in excel_data:
+            return []
+            
+        coverage_data = excel_data['eUtranCellCoverage']
+        
+        if 'EutranCellFDDId' not in coverage_data.columns:
+            return []
+        
+        # Filter coverage data for the specified eNB
+        # Get cell IDs for this eNB from eUtran Parameters sheet
+        if 'eUtran Parameters' in excel_data:
+            enb_cells = excel_data['eUtran Parameters'][excel_data['eUtran Parameters']['eNBName'] == enbname]['EutranCellFDDId'].values
+            filtered_coverage_data = coverage_data[coverage_data['EutranCellFDDId'].isin(enb_cells)]
+        else:
+            # If no eUtran Parameters sheet, try to filter by eNBName in coverage sheet
+            if 'eNBName' in coverage_data.columns:
+                filtered_coverage_data = coverage_data[coverage_data['eNBName'] == enbname]
+            else:
+                filtered_coverage_data = coverage_data
+        
+        if len(filtered_coverage_data) == 0:
+            return []
+        
+        # Generate coverage commands
+        commands = []
+        for idx, row in filtered_coverage_data.iterrows():
+            if pd.notna(row['EutranCellFDDId']) and row['EutranCellFDDId'] != '':
+                cell_id = row['EutranCellFDDId']
+                
+                # Get coverage parameters with defaults if missing
+                pos_cell_bearing = row.get('posCellBearing', 0) if pd.notna(row.get('posCellBearing')) else 0
+                pos_cell_opening_angle = row.get('posCellOpeningAngle', 1200) if pd.notna(row.get('posCellOpeningAngle')) else 1200
+                pos_cell_radius = row.get('posCellRadius', 15000) if pd.notna(row.get('posCellRadius')) else 15000
+                
+                # Convert to integers
+                pos_cell_bearing = int(float(pos_cell_bearing))
+                pos_cell_opening_angle = int(float(pos_cell_opening_angle))
+                pos_cell_radius = int(float(pos_cell_radius))
+                
+                command = f"set EutranCellFDD={cell_id} eutranCellCoverage posCellBearing={pos_cell_bearing},posCellOpeningAngle={pos_cell_opening_angle},posCellRadius={pos_cell_radius}"
+                commands.append(command)
+        
+        return commands
+        
+    except Exception as e:
+        return []
 
 # Step 5: Create ZIP file with all generated XML files
 def create_zip_file(lnr_function_xml, lte_cells_xml, cell_add_mo_xml, mo_function_xml, feature_activation_xml, polygon_mos, enbname):
@@ -364,11 +425,11 @@ def main():
             #st.subheader("Generated LTE_Cells_template.xml")
             #st.text_area("LTE_Cells_template.xml", lte_cells_xml, height=400)
 
-            # Show polygon status
+            # Show polygon and coverage status
             if polygon_mos_content:
-                st.success(f"✅ Polygon file generated: 13_{enbname}_Polygon.mos")
+                st.success(f"✅ Polygon & Coverage file generated: 13_{enbname}_Polygon.mos")
             else:
-                st.warning("⚠️ No polygon data found in Excel file or no eUtranCellPolygon sheet")
+                st.warning("⚠️ No polygon or coverage data found in Excel file")
 
             # Create ZIP file with all XML files and polygon .mos file
             zip_data = create_zip_file(lnr_function_xml, lte_cells_xml, cell_add_mo_xml, mo_function_xml, feature_activation_xml, polygon_mos_content, enbname)
