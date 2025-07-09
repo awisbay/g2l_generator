@@ -61,7 +61,7 @@ def format_coordinate_for_polygon(coord):
         
     return result
 
-def generate_polygon_command(row):
+def generate_polygon_command(row, column_mappings=None):
     """
     Generate the polygon command for a single row
     Based on CIQ_LTE.xlsx format where:
@@ -71,24 +71,27 @@ def generate_polygon_command(row):
     cell_id = row['EutranCellFDDId']
     corners = []
     
-    # Define the mapping between Corner columns and their corresponding Unnamed longitude columns
-    corner_mappings = [
-        ('Corner 1', 'Unnamed: 4'),
-        ('Corner 2', 'Unnamed: 6'), 
-        ('Corner 3', 'Unnamed: 8'),
-        ('Corner 4', 'Unnamed: 10'),
-        ('Corner 5', 'Unnamed: 12'),
-        ('Corner 6', 'Unnamed: 14'),
-        ('Corner 7', 'Unnamed: 16'),
-        ('Corner 8', 'Unnamed: 18'),
-        ('Corner 9', 'Unnamed: 20'),
-        ('Corner 10', 'Unnamed: 22'),
-        ('Corner 11', 'Unnamed: 24'),
-        ('Corner 12', 'Unnamed: 26'),
-        ('Corner 13', 'Unnamed: 28'),
-        ('Corner 14', 'Unnamed: 30'),
-        ('Corner 15', 'Unnamed: 32')
-    ]
+    # Use provided mappings or default mappings
+    if column_mappings is None:
+        corner_mappings = [
+            ('Corner 1', 'Unnamed: 3'),
+            ('Corner 2', 'Unnamed: 5'), 
+            ('Corner 3', 'Unnamed: 7'),
+            ('Corner 4', 'Unnamed: 9'),
+            ('Corner 5', 'Unnamed: 11'),
+            ('Corner 6', 'Unnamed: 13'),
+            ('Corner 7', 'Unnamed: 15'),
+            ('Corner 8', 'Unnamed: 17'),
+            ('Corner 9', 'Unnamed: 19'),
+            ('Corner 10', 'Unnamed: 21'),
+            ('Corner 11', 'Unnamed: 23'),
+            ('Corner 12', 'Unnamed: 25'),
+            ('Corner 13', 'Unnamed: 27'),
+            ('Corner 14', 'Unnamed: 29'),
+            ('Corner 15', 'Unnamed: 31')
+        ]
+    else:
+        corner_mappings = column_mappings
     
     for lat_col, lon_col in corner_mappings:
         if lat_col in row.index and lon_col in row.index:
@@ -147,11 +150,14 @@ def load_excel_and_convert(file_path):
         if 'EutranCellFDDId' not in polygon_data.columns:
             return None, "EutranCellFDDId column not found in eUtranCellPolygon sheet"
         
+        # Detect the correct column mapping for this file
+        column_mappings = detect_polygon_column_mapping(polygon_data)
+        
         # Generate polygon commands
         commands = []
         for idx, row in polygon_data.iterrows():
             if pd.notna(row['EutranCellFDDId']) and row['EutranCellFDDId'] != '':
-                command = generate_polygon_command(row)
+                command = generate_polygon_command(row, column_mappings)
                 commands.append(command)
         
         return commands, f"Successfully processed {len(commands)} cells from eUtranCellPolygon sheet"
@@ -181,6 +187,27 @@ def load_excel_and_convert_coverage(file_path):
         
     except Exception as e:
         return None, f"Error reading Excel file: {str(e)}"
+
+def detect_polygon_column_mapping(polygon_data):
+    """
+    Detect the correct column mapping for polygon data based on the actual columns in the file
+    """
+    columns = list(polygon_data.columns)
+    mappings = []
+    
+    # Look for Corner columns and their corresponding Unnamed columns
+    for i in range(1, 16):  # Check up to 15 corners
+        corner_col = f'Corner {i}'
+        if corner_col in columns:
+            corner_idx = columns.index(corner_col)
+            
+            # The longitude column should be the very next column after Corner
+            # and it should be an Unnamed column
+            if corner_idx + 1 < len(columns) and columns[corner_idx + 1].startswith('Unnamed:'):
+                lon_col = columns[corner_idx + 1]
+                mappings.append((corner_col, lon_col))
+    
+    return mappings
 
 # Streamlit App Interface
 def main():

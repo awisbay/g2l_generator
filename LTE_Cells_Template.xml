@@ -150,8 +150,8 @@
 							<otdoaSuplActive>false</otdoaSuplActive>
 							<prsConfigIndex>-1</prsConfigIndex>
 							<noConsecutiveSubframes>SF1</noConsecutiveSubframes>
-							<latitude>45392972</latitude>
-							<longitude>-72755788</longitude>
+							<latitude>{latitude}</latitude>
+							<longitude>{longitude}</longitude>
 							<altitude>0</altitude>
 							<uncertSemiMajor>0</uncertSemiMajor>
 							<uncertSemiMinor>0</uncertSemiMinor>
@@ -808,11 +808,12 @@
 								<tReselectionCdma1xRttSfMedium>100</tReselectionCdma1xRttSfMedium>
 							</systemInformationBlock8>
 						</EUtranCellFDD>
+						<!-- 
 						<UlCompGroup>
 							<ulCompGroupId>850</ulCompGroupId>
 							<sectorCarrierRef>ManagedElement=1,ENodeBFunction=1,SectorCarrier=DPL358A</sectorCarrierRef>
 							<administrativeState>UNLOCKED</administrativeState>
-						</UlCompGroup>
+						</UlCompGroup>-->
 					</ENodeBFunction>
 				</ManagedElement>
 			</config>
